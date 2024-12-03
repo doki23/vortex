@@ -79,7 +79,7 @@ pub fn or_kleene(
     binary_boolean(lhs.as_ref(), rhs.as_ref(), BinaryOperator::OrKleene)
 }
 
-pub(crate) fn binary_boolean(
+pub fn binary_boolean(
     lhs: &ArrayData,
     rhs: &ArrayData,
     op: BinaryOperator,
