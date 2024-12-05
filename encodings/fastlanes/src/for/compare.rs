@@ -14,7 +14,7 @@ impl CompareFn<FoRArray> for FoREncoding {
         // this is cheap
         let owned_lhs = lhs.clone();
         let decompressed_lhs = decompress(owned_lhs)?;
-        compare(decompressed_lhs, rhs, operator).map(|array_data| Some(array_data))
+        compare(decompressed_lhs, rhs, operator).map(Some)
     }
 }
 

@@ -2,8 +2,8 @@ use std::ops::AddAssign;
 
 use num_traits::{CheckedShl, CheckedShr, WrappingAdd, WrappingSub};
 use vortex_array::compute::{
-    filter, scalar_at, search_sorted, slice, take, ComputeVTable, FilterFn, FilterMask, ScalarAtFn,
-    SearchResult, SearchSortedFn, SearchSortedSide, SliceFn, TakeFn, TakeOptions,
+    filter, scalar_at, search_sorted, slice, take, CompareFn, ComputeVTable, FilterFn, FilterMask,
+    ScalarAtFn, SearchResult, SearchSortedFn, SearchSortedSide, SliceFn, TakeFn, TakeOptions,
 };
 use vortex_array::variants::PrimitiveArrayTrait;
 use vortex_array::{ArrayDType, ArrayData, IntoArrayData};
@@ -14,6 +14,10 @@ use vortex_scalar::{PValue, Scalar};
 use crate::{FoRArray, FoREncoding};
 
 impl ComputeVTable for FoREncoding {
+    fn compare_fn(&self) -> Option<&dyn CompareFn<ArrayData>> {
+        Some(self)
+    }
+
     fn filter_fn(&self) -> Option<&dyn FilterFn<ArrayData>> {
         Some(self)
     }
