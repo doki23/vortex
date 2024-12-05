@@ -1,4 +1,4 @@
-use vortex_dtype::{DType, Nullability};
+use vortex_dtype::DType;
 use vortex_error::VortexResult;
 
 use crate::array::{ChunkedArray, ChunkedEncoding};
@@ -22,10 +22,8 @@ impl BinaryBooleanFn<ChunkedArray> for ChunkedEncoding {
             idx += chunk.len();
         }
 
-        let dtype = chunks
-            .first()
-            .map(|chunk| chunk.dtype().clone())
-            .unwrap_or(DType::Bool(Nullability::Nullable));
+        let nullable = lhs.dtype().is_nullable() || rhs.dtype().is_nullable();
+        let dtype = DType::Bool(nullable.into());
         Ok(Some(ChunkedArray::try_new(chunks, dtype)?.into_array()))
     }
 }
