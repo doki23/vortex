@@ -113,13 +113,14 @@ impl RowMask {
             indices
                 .maybe_null_slice::<u64>()
                 .iter()
-                .map(|&i| i as usize),
+                .copied()
+                .map(|i| usize::try_from(i).vortex_unwrap()),
         );
         RowMask::try_new(bools.into_array(), begin, end)
     }
 
     /// Combine the RowMask with bitmask values resulting in new RowMask containing only values true in the bitmask
-    pub fn and_bitmask(self, bitmask: ArrayData) -> VortexResult<Self> {
+    pub fn and_bitmask(&self, bitmask: ArrayData) -> VortexResult<Self> {
         // If we are a dense all true bitmap just take the bitmask array
         if self.len()
             == self

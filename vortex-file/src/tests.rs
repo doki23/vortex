@@ -1,8 +1,10 @@
+#![allow(clippy::cast_possible_truncation)]
 use std::collections::BTreeSet;
 use std::iter;
 use std::sync::{Arc, RwLock};
 
 use futures::StreamExt;
+use futures_util::TryStreamExt;
 use itertools::Itertools;
 use vortex_array::accessor::ArrayAccessor;
 use vortex_array::array::{ChunkedArray, PrimitiveArray, StructArray, VarBinArray};
@@ -127,7 +129,7 @@ async fn test_splits() {
         .unwrap();
     let layout_serde = LayoutDeserializer::default();
 
-    let dtype = Arc::new(initial_read.lazy_dtype().unwrap());
+    let dtype = Arc::new(initial_read.lazy_dtype());
     let cache = Arc::new(RwLock::new(LayoutMessageCache::new()));
 
     let layout_reader = read_layout_from_initial(
@@ -399,7 +401,7 @@ async fn filter_string() {
     writer = writer.write_array_columns(st).await.unwrap();
 
     let written = Buffer::from(writer.finalize().await.unwrap());
-    let mut reader = VortexReadBuilder::new(written, LayoutDeserializer::default())
+    let reader = VortexReadBuilder::new(written, LayoutDeserializer::default())
         .with_row_filter(RowFilter::new(BinaryExpr::new_expr(
             Column::new_expr(Field::from("name")),
             Operator::Eq,
@@ -409,10 +411,7 @@ async fn filter_string() {
         .await
         .unwrap();
 
-    let mut result = Vec::new();
-    while let Some(array) = reader.next().await {
-        result.push(array.unwrap());
-    }
+    let result = reader.try_collect::<Vec<_>>().await.unwrap();
     assert_eq!(result.len(), 1);
     let names = result[0].as_struct_array().unwrap().field(0).unwrap();
     assert_eq!(

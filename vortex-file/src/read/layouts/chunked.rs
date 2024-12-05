@@ -1,14 +1,16 @@
 use std::collections::BTreeSet;
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use bytes::Bytes;
 use itertools::Itertools;
 use vortex_array::aliases::hash_map::HashMap;
 use vortex_array::array::ChunkedArray;
 use vortex_array::compute::{scalar_at, take, TakeOptions};
-use vortex_array::stats::{ArrayStatistics as _, Stat};
+use vortex_array::stats::{stats_from_bitset_bytes, ArrayStatistics as _, Stat};
 use vortex_array::{ArrayDType, ArrayData, IntoArrayData};
+use vortex_dtype::{DType, Nullability, StructDType};
 use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexExpect as _, VortexResult};
+use vortex_expr::Select;
 use vortex_flatbuffers::footer;
 
 use crate::layouts::RangedLayoutReader;
@@ -16,8 +18,8 @@ use crate::pruning::PruningPredicate;
 use crate::read::cache::RelativeLayoutCache;
 use crate::read::mask::RowMask;
 use crate::{
-    BatchRead, Layout, LayoutDeserializer, LayoutId, LayoutPartId, LayoutReader, MessageLocator,
-    MetadataRead, PruningRead, Scan, CHUNKED_LAYOUT_ID,
+    BatchRead, Layout, LayoutDeserializer, LayoutId, LayoutPartId, LayoutReader, LazyDType,
+    MessageLocator, MetadataRead, PruningRead, Scan, CHUNKED_LAYOUT_ID,
 };
 
 #[derive(Default, Debug)]
@@ -76,29 +78,31 @@ impl ChunkedLayoutBuilder {
     }
 
     fn metadata_layout(&self) -> VortexResult<Option<Box<dyn LayoutReader>>> {
-        self.has_metadata()
-            .then(|| {
+        self.flatbuffer()
+            .metadata()
+            .map(|m| {
+                let set_stats = stats_from_bitset_bytes(m.bytes());
                 let metadata_fb = self
                     .flatbuffer()
                     .children()
-                    .ok_or_else(|| vortex_err!("must have metadata"))?
+                    .ok_or_else(|| vortex_err!("Must have children if layout has metadata"))?
                     .get(0);
                 self.layout_builder.read_layout(
                     self.fb_bytes.clone(),
                     metadata_fb._tab.loc(),
-                    // TODO(robert): Create stats projection
-                    Scan::empty(),
-                    self.message_cache.unknown_dtype(METADATA_LAYOUT_PART_ID),
+                    Scan::new(Some(Arc::new(Select::include(
+                        set_stats.iter().map(|s| s.to_string().into()).collect(),
+                    )))),
+                    self.message_cache.relative(
+                        METADATA_LAYOUT_PART_ID,
+                        Arc::new(LazyDType::from_dtype(stats_table_dtype(
+                            &set_stats,
+                            self.message_cache.dtype().value()?,
+                        ))),
+                    ),
                 )
             })
             .transpose()
-    }
-
-    fn has_metadata(&self) -> bool {
-        self.flatbuffer()
-            .metadata()
-            .map(|b| b.bytes()[0] != 0)
-            .unwrap_or(false)
     }
 
     fn children(&self) -> impl Iterator<Item = (usize, footer::Layout)> {
@@ -107,7 +111,11 @@ impl ChunkedLayoutBuilder {
             .unwrap_or_default()
             .iter()
             .enumerate()
-            .skip(if self.has_metadata() { 1 } else { 0 })
+            .skip(if self.flatbuffer().metadata().is_some() {
+                1
+            } else {
+                0
+            })
     }
 
     fn children_ranges(&self) -> Vec<(usize, usize)> {
@@ -144,6 +152,15 @@ impl ChunkedLayoutBuilder {
             self.scan.clone(),
         ))
     }
+}
+
+fn stats_table_dtype(stats: &[Stat], dtype: &DType) -> DType {
+    let dtypes = stats.iter().map(|s| s.dtype(dtype).as_nullable()).collect();
+
+    DType::Struct(
+        StructDType::new(stats.iter().map(|s| s.to_string().into()).collect(), dtypes),
+        Nullability::NonNullable,
+    )
 }
 
 #[derive(Debug, Default, Clone)]
@@ -221,7 +238,7 @@ impl ChunkedLayoutReader {
                     BatchRead::ReadMore(m) => {
                         messages_to_fetch.extend(m);
                     }
-                    BatchRead::Batch(a) => {
+                    BatchRead::Value(a) => {
                         *array_slot = ChildRead::Finished(Some(a));
                     }
                 }
@@ -312,10 +329,10 @@ impl LayoutReader for ChunkedLayoutReader {
                 .filter_map(ChildRead::into_value)
                 .collect::<Vec<_>>();
             match child_arrays.len() {
-                0 | 1 => Ok(child_arrays.pop().map(BatchRead::Batch)),
+                0 | 1 => Ok(child_arrays.pop().map(BatchRead::Value)),
                 _ => {
                     let dtype = child_arrays[0].dtype().clone();
-                    Ok(Some(BatchRead::Batch(
+                    Ok(Some(BatchRead::Value(
                         ChunkedArray::try_new(child_arrays, dtype)?.into_array(),
                     )))
                 }
@@ -325,24 +342,26 @@ impl LayoutReader for ChunkedLayoutReader {
         }
     }
 
-    fn read_metadata(&self) -> VortexResult<MetadataRead> {
+    fn read_metadata(&self) -> VortexResult<Option<MetadataRead>> {
         match self.metadata_layout() {
-            None => Ok(MetadataRead::None),
+            None => Ok(None),
             Some(metadata_layout) => {
                 if let Some(md) = self.cached_metadata.get() {
-                    return Ok(MetadataRead::Batches(vec![Some(md.clone())]));
+                    return Ok(Some(MetadataRead::Value(vec![Some(md.clone())])));
                 }
 
                 match metadata_layout
                     .read_selection(&RowMask::new_valid_between(0, self.n_chunks()))?
                 {
-                    Some(BatchRead::Batch(array)) => {
+                    Some(BatchRead::Value(array)) => {
                         // We don't care if the write failed
                         _ = self.cached_metadata.set(array.clone());
-                        Ok(MetadataRead::Batches(vec![Some(array)]))
+                        Ok(Some(MetadataRead::Value(vec![Some(array)])))
                     }
-                    Some(BatchRead::ReadMore(messages)) => Ok(MetadataRead::ReadMore(messages)),
-                    None => Ok(MetadataRead::None),
+                    Some(BatchRead::ReadMore(messages)) => {
+                        Ok(Some(MetadataRead::ReadMore(messages)))
+                    }
+                    None => Ok(None),
                 }
             }
         }
@@ -350,7 +369,7 @@ impl LayoutReader for ChunkedLayoutReader {
 
     fn can_prune(&self, begin: usize, end: usize) -> VortexResult<PruningRead> {
         if let Some(chunk_prunability) = self.cached_prunability.get() {
-            return Ok(PruningRead::CanPrune(self.can_prune_overlapping_chunks(
+            return Ok(PruningRead::Value(self.can_prune_overlapping_chunks(
                 chunk_prunability,
                 begin,
                 end,
@@ -358,35 +377,38 @@ impl LayoutReader for ChunkedLayoutReader {
         }
 
         let Some(predicate_expression) = self.scan.expr.as_ref() else {
-            return Ok(PruningRead::CanPrune(false));
+            return Ok(PruningRead::Value(false));
         };
 
-        Ok(match self.read_metadata()? {
-            MetadataRead::None => PruningRead::CanPrune(false),
-            MetadataRead::ReadMore(messages) => PruningRead::ReadMore(messages),
-            MetadataRead::Batches(mut batches) => {
-                if batches.len() != 1 {
-                    vortex_bail!("chunked layout should have exactly one metadata array");
-                }
-                let Some(metadata) = batches.swap_remove(0) else {
-                    vortex_bail!("chunked layout should have exactly one metadata array")
-                };
-                let prunability = PruningPredicate::try_new(predicate_expression)
-                    .map(|p| p.evaluate(&metadata))
-                    .transpose()?
-                    .flatten();
-
-                match prunability {
-                    Some(chunk_prunability) => {
-                        let is_selection_pruned =
-                            self.can_prune_overlapping_chunks(&chunk_prunability, begin, end)?;
-                        let _ = self.cached_prunability.set(chunk_prunability); // Losing the race is fine
-                        PruningRead::CanPrune(is_selection_pruned)
+        if let Some(mr) = self.read_metadata()? {
+            Ok(match mr {
+                MetadataRead::ReadMore(messages) => PruningRead::ReadMore(messages),
+                MetadataRead::Value(mut batches) => {
+                    if batches.len() != 1 {
+                        vortex_bail!("chunked layout should have exactly one metadata array");
                     }
-                    None => PruningRead::CanPrune(false),
+                    let Some(metadata) = batches.swap_remove(0) else {
+                        vortex_bail!("chunked layout should have exactly one metadata array")
+                    };
+                    let prunability = PruningPredicate::try_new(predicate_expression)
+                        .map(|p| p.evaluate(&metadata))
+                        .transpose()?
+                        .flatten();
+
+                    match prunability {
+                        Some(chunk_prunability) => {
+                            let is_selection_pruned =
+                                self.can_prune_overlapping_chunks(&chunk_prunability, begin, end)?;
+                            let _ = self.cached_prunability.set(chunk_prunability); // Losing the race is fine
+                            PruningRead::Value(is_selection_pruned)
+                        }
+                        None => PruningRead::Value(false),
+                    }
                 }
-            }
-        })
+            })
+        } else {
+            Ok(PruningRead::Value(false))
+        }
     }
 }
 
@@ -452,7 +474,7 @@ mod tests {
         let written = writer.into_inner();
 
         let mut fb = FlatBufferBuilder::new();
-        let chunked_layout = write::LayoutSpec::chunked(flat_layouts.into(), len as u64, false);
+        let chunked_layout = write::LayoutSpec::chunked(flat_layouts.into(), len as u64, None);
         let flat_buf = chunked_layout.write_flatbuffer(&mut fb);
         fb.finish_minimal(flat_buf);
         let fb_bytes = Bytes::copy_from_slice(fb.finished_data());
