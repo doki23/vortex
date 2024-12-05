@@ -14,19 +14,19 @@ impl BinaryBooleanFn<ChunkedArray> for ChunkedEncoding {
     ) -> VortexResult<Option<ArrayData>> {
         let mut idx = 0;
         let mut chunks = Vec::with_capacity(lhs.nchunks());
-        let mut nullability = Nullability::Nullable;
 
         for chunk in lhs.chunks() {
             let sliced = slice(rhs, idx, idx + chunk.len())?;
             let result = binary_boolean(&chunk, &sliced, op)?;
-            nullability = result.dtype().nullability();
             chunks.push(result);
             idx += chunk.len();
         }
 
-        Ok(Some(
-            ChunkedArray::try_new(chunks, DType::Bool(nullability))?.into_array(),
-        ))
+        let dtype = chunks
+            .first()
+            .map(|chunk| chunk.dtype().clone())
+            .unwrap_or(DType::Bool(Nullability::Nullable));
+        Ok(Some(ChunkedArray::try_new(chunks, dtype)?.into_array()))
     }
 }
 
@@ -45,10 +45,10 @@ mod tests {
         let chunked1 =
             ChunkedArray::try_new(vec![arr0, arr1], DType::Bool(Nullability::NonNullable)).unwrap();
 
-        let arr2 = BoolArray::from_iter(vec![false, true]).into_array();
-        let arr3 = BoolArray::from_iter(vec![false, false, false]).into_array();
+        let arr2 = BoolArray::from_iter(vec![Some(false), Some(true)]).into_array();
+        let arr3 = BoolArray::from_iter(vec![Some(false), None, Some(false)]).into_array();
         let chunked2 =
-            ChunkedArray::try_new(vec![arr2, arr3], DType::Bool(Nullability::NonNullable)).unwrap();
+            ChunkedArray::try_new(vec![arr2, arr3], DType::Bool(Nullability::Nullable)).unwrap();
 
         assert_eq!(
             binary_boolean(
