@@ -3,7 +3,9 @@ use std::any::type_name;
 use num_traits::{FromPrimitive, NumCast};
 use vortex_dtype::half::f16;
 use vortex_dtype::{match_each_native_ptype, DType, NativePType, Nullability, PType};
-use vortex_error::{vortex_err, vortex_panic, VortexError, VortexResult, VortexUnwrap};
+use vortex_error::{
+    vortex_bail, vortex_err, vortex_panic, VortexError, VortexResult, VortexUnwrap,
+};
 
 use crate::pvalue::PValue;
 use crate::value::ScalarValue;
@@ -103,6 +105,27 @@ impl<'a> PrimitiveScalar<'a> {
             }?)),
         }
     }
+
+    pub fn subtract(&self, other: &PrimitiveScalar) -> VortexResult<Self> {
+        if self.ptype != other.ptype {
+            vortex_bail!("Failed to subtract {} and {}", self.ptype, other.ptype)
+        }
+        let result_pvalue: Option<PValue> = match_each_native_ptype!(self.ptype, |$T| {
+            let lhs = self.as_::<$T>()?;
+            let rhs = other.as_::<$T>()?;
+            match (lhs, rhs) {
+                (Some(lv), Some(rv)) => {
+                    Some((lv - rv).into())
+                },
+                _ => None
+            }
+        });
+        Ok(Self {
+            dtype: self.dtype,
+            ptype: self.ptype,
+            pvalue: result_pvalue,
+        })
+    }
 }
 
 pub trait FromPrimitiveOrF16: FromPrimitive {
@@ -151,6 +174,14 @@ impl<'a> TryFrom<&'a Scalar> for PrimitiveScalar<'a> {
 
     fn try_from(value: &'a Scalar) -> Result<Self, Self::Error> {
         Self::try_new(value.dtype(), value.value())
+    }
+}
+
+impl std::ops::Sub for PrimitiveScalar<'_> {
+    type Output = VortexResult<Self>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.subtract(&rhs)
     }
 }
 
@@ -268,5 +299,39 @@ impl TryFrom<&Scalar> for usize {
 impl From<usize> for Scalar {
     fn from(value: usize) -> Self {
         Scalar::primitive(value as u64, Nullability::NonNullable)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vortex_dtype::{DType, Nullability, PType};
+
+    use crate::value::InnerScalarValue;
+    use crate::{PValue, PrimitiveScalar, ScalarValue};
+
+    #[test]
+    fn test_subtract() {
+        let dtype = DType::Primitive(PType::I32, Nullability::NonNullable);
+        let p_scalar1 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::I32(5))),
+        )
+        .unwrap();
+        let p_scalar2 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::I32(4))),
+        )
+        .unwrap();
+        let res = p_scalar1.subtract(&p_scalar2).unwrap();
+        assert_eq!(res.as_::<i32>().unwrap().unwrap(), 1);
+
+        assert_eq!(
+            (p_scalar1 - p_scalar2)
+                .unwrap()
+                .as_::<i32>()
+                .unwrap()
+                .unwrap(),
+            1
+        );
     }
 }
