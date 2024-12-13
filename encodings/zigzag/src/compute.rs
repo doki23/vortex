@@ -29,6 +29,13 @@ impl ComputeVTable for ZigZagEncoding {
     }
 }
 
+impl FilterFn<ZigZagArray> for ZigZagEncoding {
+    fn filter(&self, array: &ZigZagArray, mask: FilterMask) -> VortexResult<ArrayData> {
+        let encoded = filter(&array.encoded(), mask)?;
+        Ok(ZigZagArray::try_new(encoded)?.into_array())
+    }
+}
+
 impl ScalarAtFn<ZigZagArray> for ZigZagEncoding {
     fn scalar_at(&self, array: &ZigZagArray, index: usize) -> VortexResult<Scalar> {
         let scalar = scalar_at(array.encoded(), index)?;
@@ -61,13 +68,6 @@ impl SliceFn<ZigZagArray> for ZigZagEncoding {
 impl TakeFn<ZigZagArray> for ZigZagEncoding {
     fn take(&self, array: &ZigZagArray, indices: &ArrayData) -> VortexResult<ArrayData> {
         let encoded = take(array.encoded(), indices)?;
-        Ok(ZigZagArray::try_new(encoded)?.into_array())
-    }
-}
-
-impl FilterFn<ZigZagArray> for ZigZagEncoding {
-    fn filter(&self, array: &ZigZagArray, mask: FilterMask) -> VortexResult<ArrayData> {
-        let encoded = filter(&array.encoded(), mask)?;
         Ok(ZigZagArray::try_new(encoded)?.into_array())
     }
 }
