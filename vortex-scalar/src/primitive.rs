@@ -2,7 +2,10 @@ use std::any::type_name;
 
 use num_traits::{FromPrimitive, NumCast};
 use vortex_dtype::half::f16;
-use vortex_dtype::{match_each_native_ptype, DType, NativePType, Nullability, PType};
+use vortex_dtype::{
+    match_each_float_ptype, match_each_integer_ptype, match_each_native_ptype, DType, NativePType,
+    Nullability, PType,
+};
 use vortex_error::{
     vortex_bail, vortex_err, vortex_panic, VortexError, VortexResult, VortexUnwrap,
 };
@@ -106,20 +109,39 @@ impl<'a> PrimitiveScalar<'a> {
         }
     }
 
-    pub fn subtract(&self, other: &PrimitiveScalar) -> VortexResult<Self> {
+    pub fn checked_sub(&self, other: &PrimitiveScalar) -> VortexResult<Self> {
         if self.ptype != other.ptype {
             vortex_bail!("Failed to subtract {} and {}", self.ptype, other.ptype)
         }
-        let result_pvalue: Option<PValue> = match_each_native_ptype!(self.ptype, |$T| {
-            let lhs = self.as_::<$T>()?;
-            let rhs = other.as_::<$T>()?;
-            match (lhs, rhs) {
-                (Some(lv), Some(rv)) => {
-                    Some((lv - rv).into())
-                },
-                _ => None
-            }
-        });
+        let result_pvalue: Option<PValue> = if !self.ptype.is_float() {
+            // checked_sub only implemented by integer type
+            match_each_integer_ptype!(self.ptype, |$T| {
+                let lhs = self.as_::<$T>()?;
+                let rhs = other.as_::<$T>()?;
+                match (lhs, rhs) {
+                    (Some(lv), Some(rv)) => {
+                        lv.checked_sub(rv).map(PValue::from)
+                    },
+                    _ => None
+                }
+            })
+        } else {
+            match_each_float_ptype!(self.ptype, |$T| {
+                let lhs = self.as_::<$T>()?;
+                let rhs = other.as_::<$T>()?;
+                match (lhs, rhs) {
+                    (Some(lv), Some(rv)) => {
+                        let f = lv - rv;
+                        if f.is_infinite() || f.is_nan() {
+                            None
+                        } else {
+                            Some(f.into())
+                        }
+                    },
+                    _ => None
+                }
+            })
+        };
         Ok(Self {
             dtype: self.dtype,
             ptype: self.ptype,
@@ -181,7 +203,7 @@ impl std::ops::Sub for PrimitiveScalar<'_> {
     type Output = VortexResult<Self>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self.subtract(&rhs)
+        self.checked_sub(&rhs)
     }
 }
 
@@ -310,7 +332,7 @@ mod tests {
     use crate::{PValue, PrimitiveScalar, ScalarValue};
 
     #[test]
-    fn test_subtract() {
+    fn test_integer_subtract() {
         let dtype = DType::Primitive(PType::I32, Nullability::NonNullable);
         let p_scalar1 = PrimitiveScalar::try_new(
             &dtype,
@@ -322,7 +344,7 @@ mod tests {
             &ScalarValue(InnerScalarValue::Primitive(PValue::I32(4))),
         )
         .unwrap();
-        let res = p_scalar1.subtract(&p_scalar2).unwrap();
+        let res = p_scalar1.checked_sub(&p_scalar2).unwrap();
         assert_eq!(res.as_::<i32>().unwrap().unwrap(), 1);
 
         assert_eq!(
@@ -333,5 +355,65 @@ mod tests {
                 .unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn test_integer_subtract_overflow() {
+        let dtype = DType::Primitive(PType::I32, Nullability::NonNullable);
+        let p_scalar1 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::I32(i32::MIN))),
+        )
+        .unwrap();
+        let p_scalar2 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::I32(i32::MAX))),
+        )
+        .unwrap();
+        let res = p_scalar1 - p_scalar2;
+        assert!(res.unwrap().pvalue.is_none());
+    }
+
+    #[test]
+    fn test_float_subtract() {
+        let dtype = DType::Primitive(PType::F32, Nullability::NonNullable);
+        let p_scalar1 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(1.99f32))),
+        )
+        .unwrap();
+        let p_scalar2 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(1.0f32))),
+        )
+        .unwrap();
+        let res = p_scalar1.checked_sub(&p_scalar2).unwrap();
+        assert_eq!(res.as_::<f32>().unwrap().unwrap(), 0.99f32);
+
+        assert_eq!(
+            (p_scalar1 - p_scalar2)
+                .unwrap()
+                .as_::<f32>()
+                .unwrap()
+                .unwrap(),
+            0.99f32
+        );
+    }
+
+    #[test]
+    fn test_float_subtract_overflow() {
+        let dtype = DType::Primitive(PType::F32, Nullability::NonNullable);
+        let p_scalar1 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(f32::MIN))),
+        )
+        .unwrap();
+        let p_scalar2 = PrimitiveScalar::try_new(
+            &dtype,
+            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(f32::MAX))),
+        )
+        .unwrap();
+        let res = p_scalar1 - p_scalar2;
+        assert!(res.unwrap().pvalue.is_none());
     }
 }
