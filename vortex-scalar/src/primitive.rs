@@ -131,12 +131,7 @@ impl<'a> PrimitiveScalar<'a> {
                 let rhs = other.as_::<$T>()?;
                 match (lhs, rhs) {
                     (Some(lv), Some(rv)) => {
-                        let f = lv - rv;
-                        if f.is_infinite() || f.is_nan() {
-                            None
-                        } else {
-                            Some(f.into())
-                        }
+                        Some((lv - rv).into())
                     },
                     _ => None
                 }
@@ -398,22 +393,5 @@ mod tests {
                 .unwrap(),
             0.99f32
         );
-    }
-
-    #[test]
-    fn test_float_subtract_overflow() {
-        let dtype = DType::Primitive(PType::F32, Nullability::NonNullable);
-        let p_scalar1 = PrimitiveScalar::try_new(
-            &dtype,
-            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(f32::MIN))),
-        )
-        .unwrap();
-        let p_scalar2 = PrimitiveScalar::try_new(
-            &dtype,
-            &ScalarValue(InnerScalarValue::Primitive(PValue::F32(f32::MAX))),
-        )
-        .unwrap();
-        let res = p_scalar1 - p_scalar2;
-        assert!(res.unwrap().pvalue.is_none());
     }
 }
