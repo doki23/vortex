@@ -9,15 +9,15 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use vortex_dtype::{DType, Nullability, PType};
 use vortex_error::{vortex_bail, vortex_panic, VortexExpect as _, VortexResult, VortexUnwrap};
-use vortex_scalar::Scalar;
+use vortex_scalar::BinaryNumericOperator;
 
 use crate::array::primitive::PrimitiveArray;
 use crate::compute::{
-    scalar_at, search_sorted_usize, subtract_scalar, SearchSortedSide, SubtractScalarFn,
+    binary_numeric, scalar_at, search_sorted_usize, slice, BinaryNumericFn, SearchSortedSide,
 };
 use crate::encoding::ids;
 use crate::iter::{ArrayIterator, ArrayIteratorAdapter};
-use crate::stats::ArrayStatistics;
+use crate::stats::StatsSet;
 use crate::stream::{ArrayStream, ArrayStreamAdapter};
 use crate::validity::Validity::NonNullable;
 use crate::validity::{ArrayValidity, LogicalValidity, Validity, ValidityVTable};
@@ -68,15 +68,6 @@ impl ChunkedArray {
             .last()
             .vortex_expect("Chunk ends is guaranteed to have at least one element");
 
-        let stats = chunks
-            .iter()
-            .map(|chunk| chunk.statistics().to_set())
-            .reduce(|mut acc, stats| {
-                acc.merge_ordered(&stats);
-                acc
-            })
-            .unwrap_or_default();
-
         let mut children = Vec::with_capacity(chunks.len() + 1);
         children.push(PrimitiveArray::from_vec(chunk_offsets, NonNullable).into_array());
         children.extend(chunks);
@@ -86,7 +77,7 @@ impl ChunkedArray {
             length.try_into().vortex_unwrap(),
             ChunkedMetadata { nchunks },
             children.into(),
-            stats,
+            StatsSet::default(),
         )
     }
 
@@ -243,17 +234,25 @@ impl ValidityVTable<ChunkedArray> for ChunkedEncoding {
     }
 }
 
-impl SubtractScalarFn<ChunkedArray> for ChunkedEncoding {
-    fn subtract_scalar(
+impl BinaryNumericFn<ChunkedArray> for ChunkedEncoding {
+    fn binary_numeric(
         &self,
         array: &ChunkedArray,
-        to_subtract: &Scalar,
-    ) -> VortexResult<ArrayData> {
-        let chunks = array
-            .chunks()
-            .map(|chunk| subtract_scalar(&chunk, to_subtract))
-            .collect::<VortexResult<Vec<_>>>()?;
-        Ok(ChunkedArray::try_new(chunks, array.dtype().clone())?.into_array())
+        rhs: &ArrayData,
+        op: BinaryNumericOperator,
+    ) -> VortexResult<Option<ArrayData>> {
+        let mut start = 0;
+
+        let mut new_chunks = Vec::with_capacity(array.nchunks());
+        for chunk in array.chunks() {
+            let end = start + chunk.len();
+            new_chunks.push(binary_numeric(&chunk, &slice(rhs, start, end)?, op)?);
+            start = end;
+        }
+
+        ChunkedArray::try_new(new_chunks, array.dtype().clone())
+            .map(IntoArrayData::into_array)
+            .map(Some)
     }
 }
 
@@ -263,7 +262,7 @@ mod test {
     use vortex_error::VortexResult;
 
     use crate::array::chunked::ChunkedArray;
-    use crate::compute::{scalar_at, subtract_scalar};
+    use crate::compute::{scalar_at, sub_scalar};
     use crate::{assert_arrays_eq, ArrayDType, IntoArrayData, IntoArrayVariant};
 
     fn chunked_array() -> ChunkedArray {
@@ -280,9 +279,9 @@ mod test {
 
     #[test]
     fn test_scalar_subtract() {
-        let chunked = chunked_array();
+        let chunked = chunked_array().into_array();
         let to_subtract = 1u64;
-        let array = subtract_scalar(&chunked, &to_subtract.into()).unwrap();
+        let array = sub_scalar(&chunked, to_subtract.into()).unwrap();
 
         let chunked = ChunkedArray::try_from(array).unwrap();
         let mut chunks_out = chunked.chunks();

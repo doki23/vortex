@@ -3,8 +3,7 @@ use std::ptr;
 use std::sync::Arc;
 mod accessor;
 
-use arrow_buffer::{ArrowNativeType, BooleanBufferBuilder, Buffer as ArrowBuffer, MutableBuffer};
-use bytes::Bytes;
+use arrow_buffer::{ArrowNativeType, BooleanBufferBuilder, Buffer as ArrowBuffer};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use vortex_buffer::Buffer;
@@ -71,7 +70,9 @@ impl PrimitiveArray {
     pub fn from_vec<T: NativePType>(values: Vec<T>, validity: Validity) -> Self {
         match_each_native_ptype!(T::PTYPE, |$P| {
             PrimitiveArray::new(
-                ArrowBuffer::from(MutableBuffer::from(unsafe { std::mem::transmute::<Vec<T>, Vec<$P>>(values) })).into(),
+                Buffer::from(
+                    ArrowBuffer::from(unsafe { std::mem::transmute::<Vec<T>, Vec<$P>>(values) })
+                ),
                 T::PTYPE,
                 validity,
             )
@@ -82,13 +83,6 @@ impl PrimitiveArray {
         let elems: Vec<T> = values.iter().map(|v| v.unwrap_or_default()).collect();
         let validity = Validity::from_iter(values.iter().map(|v| v.is_some()));
         Self::from_vec(elems, validity)
-    }
-
-    /// Creates a new array of type U8
-    pub fn from_bytes(bytes: Bytes, validity: Validity) -> Self {
-        let buffer = Buffer::from(bytes);
-
-        PrimitiveArray::new(buffer, PType::U8, validity)
     }
 
     pub fn validity(&self) -> Validity {

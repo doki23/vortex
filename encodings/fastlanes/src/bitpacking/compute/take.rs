@@ -1,17 +1,17 @@
 use fastlanes::BitPacking;
-use itertools::Itertools;
 use vortex_array::array::PrimitiveArray;
-use vortex_array::compute::{take, try_cast, TakeFn};
+use vortex_array::compute::{take, TakeFn};
+use vortex_array::validity::Validity;
 use vortex_array::variants::PrimitiveArrayTrait;
 use vortex_array::{
     ArrayDType, ArrayData, ArrayLen, IntoArrayData, IntoArrayVariant, IntoCanonical, ToArrayData,
 };
 use vortex_dtype::{
-    match_each_integer_ptype, match_each_unsigned_integer_ptype, DType, NativePType, Nullability,
-    PType,
+    match_each_integer_ptype, match_each_unsigned_integer_ptype, NativePType, PType,
 };
 use vortex_error::{VortexExpect as _, VortexResult};
 
+use super::chunked_indices;
 use crate::{unpack_single_primitive, BitPackedArray, BitPackedEncoding};
 
 // assuming the buffer is already allocated (which will happen at most once) then unpacking
@@ -26,14 +26,16 @@ impl TakeFn<BitPackedArray> for BitPackedEncoding {
             return take(array.clone().into_canonical()?.into_primitive()?, indices);
         }
 
-        let ptype: PType = array.dtype().try_into()?;
+        // NOTE: we use the unsigned PType because all values in the BitPackedArray must
+        //  be non-negative (pre-condition of creating the BitPackedArray).
+        let ptype: PType = PType::try_from(array.dtype())?.to_unsigned();
         let validity = array.validity();
         let taken_validity = validity.take(indices)?;
 
         let indices = indices.clone().into_primitive()?;
         let taken = match_each_unsigned_integer_ptype!(ptype, |$T| {
             match_each_integer_ptype!(indices.ptype(), |$I| {
-                PrimitiveArray::from_vec(take_primitive::<$T, $I>(array, &indices)?, taken_validity)
+                take_primitive::<$T, $I>(array, &indices, taken_validity)?
             })
         });
         Ok(taken.reinterpret_cast(ptype).into_array())
@@ -43,9 +45,10 @@ impl TakeFn<BitPackedArray> for BitPackedEncoding {
 fn take_primitive<T: NativePType + BitPacking, I: NativePType>(
     array: &BitPackedArray,
     indices: &PrimitiveArray,
-) -> VortexResult<Vec<T>> {
+    taken_validity: Validity,
+) -> VortexResult<PrimitiveArray> {
     if indices.is_empty() {
-        return Ok(vec![]);
+        return Ok(PrimitiveArray::from_vec(Vec::<T>::new(), taken_validity));
     }
 
     let offset = array.offset() as usize;
@@ -54,35 +57,30 @@ fn take_primitive<T: NativePType + BitPacking, I: NativePType>(
     let packed = array.packed_slice::<T>();
 
     // Group indices by 1024-element chunk, *without* allocating on the heap
-    let chunked_indices = &indices
-        .maybe_null_slice::<I>()
-        .iter()
-        .map(|i| {
-            i.to_usize()
-                .vortex_expect("index must be expressible as usize")
-                + offset
-        })
-        .chunk_by(|idx| idx / 1024);
+    let indices_iter = indices.maybe_null_slice::<I>().iter().map(|i| {
+        i.to_usize()
+            .vortex_expect("index must be expressible as usize")
+    });
 
     let mut output = Vec::with_capacity(indices.len());
     let mut unpacked = [T::zero(); 1024];
+    let chunk_len = 128 * bit_width / size_of::<T>();
 
-    for (chunk, offsets) in chunked_indices {
-        let chunk_size = 128 * bit_width / size_of::<T>();
-        let packed_chunk = &packed[chunk * chunk_size..][..chunk_size];
+    chunked_indices(indices_iter, offset, |chunk_idx, indices_within_chunk| {
+        let packed = &packed[chunk_idx * chunk_len..][..chunk_len];
 
         // array_chunks produced a fixed size array, doesn't heap allocate
         let mut have_unpacked = false;
-        let mut offset_chunk_iter = offsets
-            // relativize indices to the start of the chunk
-            .map(|i| i % 1024)
+        let mut offset_chunk_iter = indices_within_chunk
+            .iter()
+            .copied()
             .array_chunks::<UNPACK_CHUNK_THRESHOLD>();
 
         // this loop only runs if we have at least UNPACK_CHUNK_THRESHOLD offsets
         for offset_chunk in &mut offset_chunk_iter {
             if !have_unpacked {
                 unsafe {
-                    BitPacking::unchecked_unpack(bit_width, packed_chunk, &mut unpacked);
+                    BitPacking::unchecked_unpack(bit_width, packed, &mut unpacked);
                 }
                 have_unpacked = true;
             }
@@ -103,37 +101,20 @@ fn take_primitive<T: NativePType + BitPacking, I: NativePType>(
                 // we had fewer than UNPACK_CHUNK_THRESHOLD offsets in the first place,
                 // so we need to unpack each one individually
                 for index in remainder {
-                    output.push(unsafe {
-                        unpack_single_primitive::<T>(packed_chunk, bit_width, index)
-                    });
+                    output.push(unsafe { unpack_single_primitive::<T>(packed, bit_width, index) });
                 }
             }
         }
-    }
+    });
 
-    if let Some(patches) = array
-        .patches()
-        .map(|p| p.take(&indices.to_array()))
-        .transpose()?
-        .flatten()
-    {
-        let indices = try_cast(
-            patches.indices(),
-            &DType::Primitive(PType::U64, Nullability::NonNullable),
-        )?
-        .into_primitive()?;
-
-        // TODO(ngates): can patch values themselves have nulls, or do we ensure they're in our
-        //  validity bitmap?
-        let values = patches.values().clone().into_primitive()?;
-        let values_slice = values.maybe_null_slice::<T>();
-
-        for (idx, v) in indices.maybe_null_slice::<u64>().iter().zip(values_slice) {
-            output[*idx as usize] = *v;
+    let unpatched_taken = PrimitiveArray::from_vec(output, taken_validity);
+    if let Some(patches) = array.patches() {
+        if let Some(patches) = patches.take(&indices.to_array())? {
+            return unpatched_taken.patch(patches);
         }
     }
 
-    Ok(output)
+    Ok(unpatched_taken)
 }
 
 #[cfg(test)]

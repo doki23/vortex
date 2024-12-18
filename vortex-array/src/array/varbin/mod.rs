@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, PrimInt};
 use serde::{Deserialize, Serialize};
 pub use stats::compute_varbin_statistics;
 use vortex_buffer::Buffer;
@@ -24,8 +24,8 @@ mod accessor;
 mod array;
 mod arrow;
 pub mod builder;
+mod canonical;
 mod compute;
-mod flatten;
 mod stats;
 mod variants;
 
@@ -150,12 +150,12 @@ impl VarBinArray {
         }
     }
 
-    fn from_vec_sized<K, T>(vec: Vec<T>, dtype: DType) -> Self
+    fn from_vec_sized<O, T>(vec: Vec<T>, dtype: DType) -> Self
     where
-        K: NativePType,
+        O: NativePType + PrimInt,
         T: AsRef<[u8]>,
     {
-        let mut builder = VarBinBuilder::<K>::with_capacity(vec.len());
+        let mut builder = VarBinBuilder::<O>::with_capacity(vec.len());
         for v in vec {
             builder.push_value(v.as_ref());
         }

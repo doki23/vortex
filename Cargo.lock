@@ -50,6 +50,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aligned-buffer"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b0ccaa876f7e00c6a4818bf878d5d4b387eff28c79bea024824469ec25509d"
+dependencies = [
+ "const_panic",
+ "crossbeam-utils",
+ "rkyv",
+ "stable_deref_trait",
+ "static_assertions",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "alloc-no-stdlib"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,7 +477,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bench-vortex"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -552,6 +566,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
+name = "bytecheck"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50c8f430744b23b54ad15161fcbc22d82a29b73eacbe425fea23ec822600bc6f"
+dependencies = [
+ "bytecheck_derive",
+ "ptr_meta",
+ "rancor",
+ "simdutf8",
+]
+
+[[package]]
+name = "bytecheck_derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "523363cbe1df49b68215efdf500b103ac3b0fb4836aed6d15689a076eadb8fff"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
 name = "bytecount"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -571,9 +608,9 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 
 [[package]]
 name = "bzip2"
-version = "0.4.4"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdb116a6ef3f6c3698828873ad02c3014b3c85cadb88496095628e3ef1e347f8"
+checksum = "bafdbf26611df8c14810e268ddceda071c297570a5fb360ceddf617fe417ef58"
 dependencies = [
  "bzip2-sys",
  "libc",
@@ -1002,6 +1039,12 @@ name = "const_for"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c50fcfdf972929aff202c16b80086aa3cfc6a3a820af714096c58c7c1d0582"
+
+[[package]]
+name = "const_panic"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53857514f72ee4a2b583de67401e3ff63a5472ca4acf289d09a9ea7636dfec17"
 
 [[package]]
 name = "core-foundation"
@@ -1676,26 +1719,6 @@ name = "enum-iterator-derive"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1ab991c1362ac86c61ab6f556cff143daa22e5a15e4e189df818b2fd19fe65b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.90",
-]
-
-[[package]]
-name = "enum-map"
-version = "2.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6866f3bfdf8207509a033af1a75a7b08abda06bbaaeae6669323fd5a097df2e9"
-dependencies = [
- "enum-map-derive",
-]
-
-[[package]]
-name = "enum-map-derive"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f282cfdfe92516eb26c2af8589c274c7c17681f5ecc03c18255fe741c6aa64eb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2766,6 +2789,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defc4c55412d89136f966bbb339008b474350e5e6e78d2714439c386b3137a03"
 
 [[package]]
+name = "munge"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64142d38c84badf60abf06ff9bd80ad2174306a5b11bd4706535090a30a419df"
+dependencies = [
+ "munge_macro",
+]
+
+[[package]]
+name = "munge_macro"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bb5c1d8184f13f7d0ccbeeca0def2f9a181bce2624302793005f5ca8aa62e5e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
 name = "nanorand"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3423,6 +3466,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ptr_meta"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe9e76f66d3f9606f44e45598d155cb13ecf09f4a28199e48daf8c8fc937ea90"
+dependencies = [
+ "ptr_meta_derive",
+]
+
+[[package]]
+name = "ptr_meta_derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca414edb151b4c8d125c12566ab0d74dc9cdba36fb80eb7b848c15f495fd32d1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
 name = "pyo3"
 version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3498,7 +3561,7 @@ dependencies = [
 
 [[package]]
 name = "pyvortex"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow",
  "flume",
@@ -3597,6 +3660,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rancor"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caf5f7161924b9d1cea0e4cabc97c372cea92b5f927fc13c6bca67157a0ad947"
+dependencies = [
+ "ptr_meta",
 ]
 
 [[package]]
@@ -3720,6 +3792,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
+name = "rend"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a35e8a6bf28cd121053a66aa2e6a2e3eaffad4a60012179f0e864aa5ffeff215"
+dependencies = [
+ "bytecheck",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.12.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3783,6 +3864,36 @@ dependencies = [
  "spin",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rkyv"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b11a153aec4a6ab60795f8ebe2923c597b16b05bb1504377451e705ef1a45323"
+dependencies = [
+ "bytecheck",
+ "bytes",
+ "hashbrown 0.15.2",
+ "indexmap",
+ "munge",
+ "ptr_meta",
+ "rancor",
+ "rend",
+ "rkyv_derive",
+ "tinyvec",
+ "uuid",
+]
+
+[[package]]
+name = "rkyv_derive"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "beb382a4d9f53bd5c0be86b10d8179c3f8a14c30bf774ff77096ed6581e35981"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
 ]
 
 [[package]]
@@ -4083,6 +4194,12 @@ checksum = "a9e9e0b4211b72e7b8b6e85c807d36c212bdb33ea8587f7569562a84df5465b1"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "simdutf8"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "simplelog"
@@ -4739,7 +4856,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vortex"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "vortex-alp",
  "vortex-array",
@@ -4768,9 +4885,10 @@ dependencies = [
 
 [[package]]
 name = "vortex-alp"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-array",
+ "arrow-buffer",
  "divan",
  "itertools 0.13.0",
  "num-traits",
@@ -4785,7 +4903,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-array"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arbitrary",
  "arrow-arith",
@@ -4797,10 +4915,8 @@ dependencies = [
  "arrow-select",
  "arrow-string",
  "backtrace",
- "bytes",
  "criterion",
  "enum-iterator",
- "enum-map",
  "flatbuffers",
  "flexbuffers",
  "futures-util",
@@ -4827,7 +4943,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-buffer"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "bytes",
@@ -4836,7 +4952,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-bytebool"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "num-traits",
@@ -4850,13 +4966,12 @@ dependencies = [
 
 [[package]]
 name = "vortex-datafusion"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "anyhow",
  "arrow-array",
  "arrow-schema",
  "async-trait",
- "bytes",
  "chrono",
  "datafusion",
  "datafusion-common",
@@ -4874,7 +4989,6 @@ dependencies = [
  "tokio",
  "url",
  "vortex-array",
- "vortex-datetime-dtype",
  "vortex-dtype",
  "vortex-error",
  "vortex-expr",
@@ -4884,7 +4998,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-datetime-dtype"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-schema",
  "jiff",
@@ -4896,7 +5010,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-datetime-parts"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "itertools 0.13.0",
  "serde",
@@ -4909,7 +5023,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-dict"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "criterion",
@@ -4925,7 +5039,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-dtype"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arbitrary",
  "flatbuffers",
@@ -4943,7 +5057,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-error"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-schema",
  "datafusion-common",
@@ -4960,7 +5074,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-expr"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "datafusion-expr",
  "datafusion-physical-expr",
@@ -4976,7 +5090,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-fastlanes"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrayref",
  "arrow-buffer",
@@ -4995,12 +5109,11 @@ dependencies = [
 
 [[package]]
 name = "vortex-file"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
  "arrow-schema",
- "bytes",
  "flatbuffers",
  "futures",
  "futures-executor",
@@ -5023,14 +5136,15 @@ dependencies = [
 
 [[package]]
 name = "vortex-flatbuffers"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "flatbuffers",
+ "vortex-buffer",
 ]
 
 [[package]]
 name = "vortex-fsst"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -5045,7 +5159,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-fuzz"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "libfuzzer-sys",
  "vortex-array",
@@ -5058,9 +5172,9 @@ dependencies = [
 
 [[package]]
 name = "vortex-io"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
- "bytes",
+ "cfg-if",
  "compio",
  "flume",
  "futures",
@@ -5077,31 +5191,25 @@ dependencies = [
 
 [[package]]
 name = "vortex-ipc"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
- "arrow-array",
- "arrow-ipc",
- "arrow-schema",
- "arrow-select",
+ "aligned-buffer",
  "bytes",
- "criterion",
  "flatbuffers",
- "futures-executor",
  "futures-util",
  "itertools 0.13.0",
+ "pin-project-lite",
  "tokio",
  "vortex-array",
  "vortex-buffer",
  "vortex-dtype",
  "vortex-error",
  "vortex-flatbuffers",
- "vortex-io",
- "vortex-sampling-compressor",
 ]
 
 [[package]]
 name = "vortex-proto"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "prost",
  "prost-types",
@@ -5109,7 +5217,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-roaring"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "croaring",
@@ -5124,7 +5232,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-runend"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "itertools 0.13.0",
@@ -5138,7 +5246,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-runend-bool"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arrow-buffer",
  "criterion",
@@ -5155,7 +5263,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-sampling-compressor"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -5183,11 +5291,10 @@ dependencies = [
 
 [[package]]
 name = "vortex-scalar"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "arbitrary",
  "arrow-array",
- "bytes",
  "datafusion-common",
  "flatbuffers",
  "flexbuffers",
@@ -5207,7 +5314,7 @@ dependencies = [
 
 [[package]]
 name = "vortex-zigzag"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "serde",
  "vortex-array",
@@ -5573,9 +5680,9 @@ dependencies = [
 
 [[package]]
 name = "worker"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8aca53ec63e508176a89a573c972266f0f98bcc48bd866def7be0d939ef9268"
+checksum = "727789ca7eff9733efbea9d0e97779edc1cf1926e98aee7d7d8afe32805458aa"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5619,9 +5726,9 @@ dependencies = [
 
 [[package]]
 name = "worker-macros"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1118a0ceb59ddde7fdbaff6c47b6fa6ee47848975ea38b4ae9bb4080f96541cd"
+checksum = "7d625c24570ba9207a2617476013335f28a95cbe513e59bb814ffba092a18058"
 dependencies = [
  "async-trait",
  "proc-macro2",
@@ -5635,9 +5742,9 @@ dependencies = [
 
 [[package]]
 name = "worker-sys"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5643a2ba07df61aa50e37212ffcb0944417db7d3960d4331f36aeb2fa5e2fd7"
+checksum = "34563340d41016b4381257c5a16b0d2bc590dbe00500ecfbebcaa16f5f85ce90"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -5685,7 +5792,7 @@ checksum = "32ac00cd3f8ec9c1d33fb3e7958a82df6989c42d747bd326c822b1d625283547"
 
 [[package]]
 name = "xtask"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "anyhow",
  "clap",

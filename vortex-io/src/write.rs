@@ -1,7 +1,7 @@
 use std::future::{ready, Future};
 use std::io::{self, Cursor, Write};
 
-use vortex_buffer::io_buf::IoBuf;
+use crate::IoBuf;
 
 pub trait VortexWrite {
     fn write_all<B: IoBuf>(&mut self, buffer: B) -> impl Future<Output = io::Result<B>>;
@@ -38,6 +38,21 @@ where
 
     fn shutdown(&mut self) -> impl Future<Output = io::Result<()>> {
         ready(Ok(()))
+    }
+}
+
+impl<W: VortexWrite> VortexWrite for futures::io::Cursor<W> {
+    fn write_all<B: IoBuf>(&mut self, buffer: B) -> impl Future<Output = io::Result<B>> {
+        self.set_position(self.position() + buffer.as_slice().len() as u64);
+        VortexWrite::write_all(self.get_mut(), buffer)
+    }
+
+    fn flush(&mut self) -> impl Future<Output = io::Result<()>> {
+        VortexWrite::flush(self.get_mut())
+    }
+
+    fn shutdown(&mut self) -> impl Future<Output = io::Result<()>> {
+        VortexWrite::shutdown(self.get_mut())
     }
 }
 

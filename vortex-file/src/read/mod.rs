@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 
-use bytes::Bytes;
 use vortex_array::ArrayData;
 use vortex_error::VortexResult;
 
@@ -28,9 +27,10 @@ pub use filtering::RowFilter;
 pub use projection::Projection;
 pub use recordbatchreader::{AsyncRuntime, VortexRecordBatchReader};
 pub use stream::VortexFileArrayStream;
+use vortex_buffer::Buffer;
 use vortex_expr::ExprRef;
-use vortex_ipc::stream_writer::ByteRange;
 
+use crate::byte_range::ByteRange;
 pub use crate::read::mask::RowMask;
 
 // Recommended read-size according to the AWS performance guide
@@ -48,7 +48,13 @@ impl Scan {
         Self { expr: None }
     }
 
-    pub fn new(expr: Option<ExprRef>) -> Self {
+    pub fn new(expr: ExprRef) -> Self {
+        Self { expr: Some(expr) }
+    }
+}
+
+impl From<Option<ExprRef>> for Scan {
+    fn from(expr: Option<ExprRef>) -> Self {
         Self { expr }
     }
 }
@@ -63,7 +69,7 @@ pub type MessageId = Vec<LayoutPartId>;
 pub struct MessageLocator(pub MessageId, pub ByteRange);
 /// A message that has had its bytes materialized onto the heap.
 #[derive(Debug, Clone)]
-pub struct Message(pub MessageId, pub Bytes);
+pub struct Message(pub MessageId, pub Buffer);
 
 /// A polling interface for reading a value from a [`LayoutReader`].
 #[derive(Debug)]

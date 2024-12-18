@@ -2,10 +2,7 @@ use std::any::type_name;
 
 use num_traits::{FromPrimitive, NumCast};
 use vortex_dtype::half::f16;
-use vortex_dtype::{
-    match_each_float_ptype, match_each_integer_ptype, match_each_native_ptype, DType, NativePType,
-    Nullability, PType,
-};
+use vortex_dtype::{match_each_native_ptype, DType, NativePType, Nullability, PType};
 use vortex_error::{
     vortex_bail, vortex_err, vortex_panic, VortexError, VortexResult, VortexUnwrap,
 };
@@ -113,30 +110,25 @@ impl<'a> PrimitiveScalar<'a> {
         if self.ptype != other.ptype {
             vortex_bail!("Failed to subtract {} and {}", self.ptype, other.ptype)
         }
-        let result_pvalue: Option<PValue> = if !self.ptype.is_float() {
-            // checked_sub only implemented by integer type
-            match_each_integer_ptype!(self.ptype, |$T| {
+        let result_pvalue: Option<PValue> = match_each_native_ptype!(
+            self.ptype,
+            integral: |$T| {
                 let lhs = self.as_::<$T>()?;
                 let rhs = other.as_::<$T>()?;
                 match (lhs, rhs) {
-                    (Some(lv), Some(rv)) => {
-                        lv.checked_sub(rv).map(PValue::from)
-                    },
+                    (Some(lv), Some(rv)) => lv.checked_sub(rv).map(PValue::from),
                     _ => None
                 }
-            })
-        } else {
-            match_each_float_ptype!(self.ptype, |$T| {
+            }
+            floating_point: |$T| {
                 let lhs = self.as_::<$T>()?;
                 let rhs = other.as_::<$T>()?;
                 match (lhs, rhs) {
-                    (Some(lv), Some(rv)) => {
-                        Some((lv - rv).into())
-                    },
+                    (Some(lv), Some(rv)) => Some((lv - rv).into()),
                     _ => None
                 }
-            })
-        };
+            }
+        );
         Ok(Self {
             dtype: self.dtype,
             ptype: self.ptype,
@@ -316,6 +308,74 @@ impl TryFrom<&Scalar> for usize {
 impl From<usize> for Scalar {
     fn from(value: usize) -> Self {
         Scalar::primitive(value as u64, Nullability::NonNullable)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryNumericOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    // Missing from arrow-rs:
+    // Min,
+    // Max,
+    // Pow,
+}
+
+impl PrimitiveScalar<'_> {
+    /// Apply the (checked) operator to self and other using SQL-style null semantics.
+    ///
+    /// If the operation overflows, Ok(None) is returned.
+    ///
+    /// If the types are incompatible (ignoring nullability), an error is returned.
+    ///
+    /// If either value is null, the result is null.
+    pub fn checked_numeric_operator(
+        self,
+        other: PrimitiveScalar<'_>,
+        op: BinaryNumericOperator,
+    ) -> VortexResult<Option<Scalar>> {
+        if !self.dtype().eq_ignore_nullability(other.dtype()) {
+            vortex_bail!("types must match: {} {}", self.dtype(), other.dtype());
+        }
+
+        let nullability =
+            Nullability::from(self.dtype().is_nullable() || other.dtype().is_nullable());
+
+        Ok(match_each_native_ptype!(
+            self.ptype(),
+            integral: |$P| {
+                let lhs = self.typed_value::<$P>();
+                let rhs = other.typed_value::<$P>();
+                match (lhs, rhs) {
+                    (_, None) | (None, _) => Some(Scalar::null(self.dtype().with_nullability(nullability))),
+                    (Some(lhs), Some(rhs)) => match op {
+                        BinaryNumericOperator::Add =>
+                            lhs.checked_add(rhs).map(|result| Scalar::primitive(result, nullability)),
+                        BinaryNumericOperator::Sub =>
+                            lhs.checked_sub(rhs).map(|result| Scalar::primitive(result, nullability)),
+                        BinaryNumericOperator::Mul =>
+                            lhs.checked_mul(rhs).map(|result| Scalar::primitive(result, nullability)),
+                        BinaryNumericOperator::Div =>
+                            lhs.checked_div(rhs).map(|result| Scalar::primitive(result, nullability)),
+                    }
+                }
+            }
+            floating_point: |$P| {
+                let lhs = self.typed_value::<$P>();
+                let rhs = other.typed_value::<$P>();
+                Some(match (lhs, rhs) {
+                    (_, None) | (None, _) => Scalar::null(self.dtype().with_nullability(nullability)),
+                    (Some(lhs), Some(rhs)) =>  match op {
+                        BinaryNumericOperator::Add => Scalar::primitive(lhs + rhs, nullability),
+                        BinaryNumericOperator::Sub => Scalar::primitive(lhs - rhs, nullability),
+                        BinaryNumericOperator::Mul => Scalar::primitive(lhs - rhs, nullability),
+                        BinaryNumericOperator::Div => Scalar::primitive(lhs - rhs, nullability),
+                    }
+                })
+            }
+        ))
     }
 }
 

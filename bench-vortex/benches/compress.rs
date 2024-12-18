@@ -104,7 +104,7 @@ fn parquet_decompress_read(buf: bytes::Bytes) -> usize {
 }
 
 fn parquet_compressed_written_size(array: &ArrayData, compression: Compression) -> usize {
-    let chunked = ChunkedArray::maybe_from(array.clone()).unwrap();
+    let chunked = ChunkedArray::maybe_from(array).unwrap();
     let (batches, schema) = chunked_to_vec_record_batch(chunked);
     parquet_compress_write(batches, schema, compression, &mut Vec::new())
 }
@@ -291,7 +291,7 @@ fn benchmark_compress<F, U>(
             Compression::ZSTD(ZstdLevel::default()),
         );
 
-        println!(
+        eprintln!(
             "{}",
             serde_json::to_string(&GenericBenchmarkResults {
                 name: &format!("vortex:parquet-zstd size/{}", bench_name),
@@ -302,7 +302,7 @@ fn benchmark_compress<F, U>(
             .unwrap()
         );
 
-        println!(
+        eprintln!(
             "{}",
             serde_json::to_string(&GenericBenchmarkResults {
                 name: &format!("vortex:raw size/{}", bench_name),
@@ -313,7 +313,7 @@ fn benchmark_compress<F, U>(
             .unwrap()
         );
 
-        println!(
+        eprintln!(
             "{}",
             serde_json::to_string(&GenericBenchmarkResults {
                 name: &format!("vortex size/{}", bench_name),

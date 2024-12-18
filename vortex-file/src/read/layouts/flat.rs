@@ -1,13 +1,14 @@
 use std::collections::BTreeSet;
+use std::io::Cursor;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use vortex_array::{ArrayData, Context};
+use vortex_buffer::Buffer;
 use vortex_error::{vortex_bail, VortexResult};
 use vortex_flatbuffers::footer;
-use vortex_ipc::messages::reader::ArrayMessageReader;
-use vortex_ipc::stream_writer::ByteRange;
+use vortex_ipc::messages::{DecoderMessage, SyncMessageReader};
 
+use crate::byte_range::ByteRange;
 use crate::read::cache::RelativeLayoutCache;
 use crate::read::mask::RowMask;
 use crate::{
@@ -72,16 +73,16 @@ impl FlatLayoutReader {
         MessageLocator(self.message_cache.absolute_id(&[]), self.range)
     }
 
-    fn array_from_bytes(&self, mut buf: Bytes) -> VortexResult<ArrayData> {
-        let mut array_reader = ArrayMessageReader::new();
-        let mut read_buf = Bytes::new();
-        while let Some(u) = array_reader.read(read_buf)? {
-            read_buf = buf.split_to(u);
+    fn array_from_bytes(&self, buf: Buffer) -> VortexResult<ArrayData> {
+        let mut reader = SyncMessageReader::new(Cursor::new(buf));
+        match reader.next().transpose()? {
+            Some(DecoderMessage::Array(array_parts)) => array_parts.into_array_data(
+                self.ctx.clone(),
+                self.message_cache.dtype().value()?.clone(),
+            ),
+            Some(msg) => vortex_bail!("Expected Array message, got {:?}", msg),
+            None => vortex_bail!("Expected Array message, got EOF"),
         }
-        array_reader.into_array(
-            self.ctx.clone(),
-            self.message_cache.dtype().value()?.clone(),
-        )
     }
 }
 
@@ -117,14 +118,14 @@ impl LayoutReader for FlatLayoutReader {
 mod tests {
     use std::sync::{Arc, RwLock};
 
-    use bytes::Bytes;
     use vortex_array::array::PrimitiveArray;
-    use vortex_array::{Context, IntoArrayData, IntoArrayVariant};
+    use vortex_array::{Context, IntoArrayData, IntoArrayVariant, ToArrayData};
+    use vortex_buffer::Buffer;
     use vortex_dtype::PType;
     use vortex_expr::{BinaryExpr, Identity, Literal, Operator};
-    use vortex_ipc::messages::writer::MessageWriter;
-    use vortex_ipc::stream_writer::ByteRange;
+    use vortex_ipc::messages::{EncoderMessage, SyncMessageWriter};
 
+    use crate::byte_range::ByteRange;
     use crate::layouts::flat::FlatLayoutReader;
     use crate::read::cache::{LazyDType, RelativeLayoutCache};
     use crate::read::layouts::test_read::{filter_read_layout, read_layout};
@@ -132,14 +133,15 @@ mod tests {
 
     async fn read_only_layout(
         cache: Arc<RwLock<LayoutMessageCache>>,
-    ) -> (FlatLayoutReader, Bytes, usize, Arc<LazyDType>) {
-        let mut writer = MessageWriter::new(Vec::new());
+    ) -> (FlatLayoutReader, Buffer, usize, Arc<LazyDType>) {
         let array = PrimitiveArray::from((0..100).collect::<Vec<_>>()).into_array();
-        let len = array.len();
-        writer.write_batch(array).await.unwrap();
-        let written = writer.into_inner();
 
-        let projection_scan = Scan::new(None);
+        let mut written = vec![];
+        SyncMessageWriter::new(&mut written)
+            .write_message(EncoderMessage::Array(&array.to_array()))
+            .unwrap();
+
+        let projection_scan = Scan::empty();
         let dtype = Arc::new(LazyDType::from_dtype(PType::I32.into()));
 
         (
@@ -149,8 +151,8 @@ mod tests {
                 Arc::new(Context::default()),
                 RelativeLayoutCache::new(cache, dtype.clone()),
             ),
-            Bytes::from(written),
-            len,
+            Buffer::from(written),
+            array.len(),
             dtype,
         )
     }
@@ -158,7 +160,7 @@ mod tests {
     async fn layout_and_bytes(
         cache: Arc<RwLock<LayoutMessageCache>>,
         scan: Scan,
-    ) -> (FlatLayoutReader, FlatLayoutReader, Bytes, usize) {
+    ) -> (FlatLayoutReader, FlatLayoutReader, Buffer, usize) {
         let (read_layout, bytes, len, dtype) = read_only_layout(cache.clone()).await;
 
         (
@@ -180,11 +182,11 @@ mod tests {
         let cache = Arc::new(RwLock::new(LayoutMessageCache::default()));
         let (mut filter_layout, mut projection_layout, buf, length) = layout_and_bytes(
             cache.clone(),
-            Scan::new(Some(RowFilter::new_expr(BinaryExpr::new_expr(
+            Scan::new(RowFilter::new_expr(BinaryExpr::new_expr(
                 Arc::new(Identity),
                 Operator::Gt,
                 Literal::new_expr(10.into()),
-            )))),
+            ))),
         )
         .await;
         let arr = filter_read_layout(
@@ -225,11 +227,11 @@ mod tests {
         let cache = Arc::new(RwLock::new(LayoutMessageCache::default()));
         let (mut filter_layout, mut projection_layout, buf, length) = layout_and_bytes(
             cache.clone(),
-            Scan::new(Some(RowFilter::new_expr(BinaryExpr::new_expr(
+            Scan::new(RowFilter::new_expr(BinaryExpr::new_expr(
                 Arc::new(Identity),
                 Operator::Gt,
                 Literal::new_expr(101.into()),
-            )))),
+            ))),
         )
         .await;
         let arr = filter_read_layout(
