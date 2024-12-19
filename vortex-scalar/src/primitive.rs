@@ -49,6 +49,11 @@ impl<'a> PrimitiveScalar<'a> {
         self.ptype
     }
 
+    #[inline]
+    pub fn pvalue(&self) -> Option<PValue> {
+        self.pvalue
+    }
+
     pub fn typed_value<T: NativePType + TryFrom<PValue, Error = VortexError>>(&self) -> Option<T> {
         assert_eq!(
             self.ptype,
@@ -108,15 +113,6 @@ impl<'a> PrimitiveScalar<'a> {
 
     pub fn checked_sub(self, other: PrimitiveScalar<'a>) -> VortexResult<Option<Self>> {
         self.checked_numeric_operator(other, BinaryNumericOperator::Sub)
-    }
-
-    pub fn to_scalar(self) -> Scalar {
-        Scalar::new(
-            self.dtype().clone(),
-            self.pvalue
-                .map(|pvalue| ScalarValue(InnerScalarValue::Primitive(pvalue)))
-                .unwrap_or_else(|| ScalarValue(InnerScalarValue::Null)),
-        )
     }
 }
 

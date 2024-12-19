@@ -22,8 +22,7 @@ impl BinaryNumericFn<ConstantArray> for ConstantEncoding {
                     .scalar()
                     .as_primitive()
                     .checked_numeric_operator(rhs.as_primitive(), op)?
-                    .ok_or_else(|| vortex_err!("numeric overflow"))?
-                    .to_scalar(),
+                    .ok_or_else(|| vortex_err!("numeric overflow"))?,
                 array.len(),
             )
             .into_array(),
