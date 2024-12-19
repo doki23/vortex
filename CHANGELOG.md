@@ -7,6 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `vortex-datafusion` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-datafusion-v0.21.1...vortex-datafusion-v0.22.0) - 2024-12-19
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+
+## `vortex-sampling-compressor` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-sampling-compressor-v0.21.1...vortex-sampling-compressor-v0.22.0) - 2024-12-19
+
+### Added
+- BitPackedCompressor allows signed arrays (#1699)
+
+### Fixed
+- BitPackedArray enforces can only be built over non-negative values (#1705)
+
+## `vortex-runend` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-runend-v0.21.1...vortex-runend-v0.22.0) - 2024-12-19
+
+### Added
+- add BinaryNumericFn for array arithmetic (#1640)
+
+## `vortex-fsst` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-fsst-v0.21.1...vortex-fsst-v0.22.0) - 2024-12-19
+
+### Other
+- Add debug assertions to ComputeFn results ([#1716](https://github.com/doki23/vortex/pull/1716))
+
+## `vortex-ipc` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-ipc-v0.21.1...vortex-ipc-v0.22.0) - 2024-12-19
+
+### Other
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+
+## `vortex-io` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-io-v0.21.1...vortex-io-v0.22.0) - 2024-12-19
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+- move IoBuf to vortex-io (#1714)
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+- test for repeated columns in a projection (#1691)
+
+## `vortex-file` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-file-v0.21.1...vortex-file-v0.22.0) - 2024-12-19
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+- test for repeated columns in a projection (#1691)
+
+## `vortex-dict` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-dict-v0.21.1...vortex-dict-v0.22.0) - 2024-12-19
+
+### Added
+- add BinaryNumericFn for array arithmetic (#1640)
+
+## `vortex-fastlanes` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-fastlanes-v0.21.1...vortex-fastlanes-v0.22.0) - 2024-12-19
+
+### Added
+- BitPackedCompressor allows signed arrays (#1699)
+
+### Fixed
+- BitPackedArray enforces can only be built over non-negative values (#1705)
+
+### Other
+- use PrimitiveArray::patch in bitpacking take (#1690)
+
+## `vortex-scalar` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-scalar-v0.21.1...vortex-scalar-v0.22.0) - 2024-12-19
+
+### Added
+- add BinaryNumericFn for array arithmetic (#1640)
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+- Add debug assertions to ComputeFn results ([#1716](https://github.com/doki23/vortex/pull/1716))
+- Added a list builder ([#1711](https://github.com/doki23/vortex/pull/1711))
+
+## `vortex-flatbuffers` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-flatbuffers-v0.21.1...vortex-flatbuffers-v0.22.0) - 2024-12-19
+
+### Other
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+
+## `vortex-dtype` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-dtype-v0.21.1...vortex-dtype-v0.22.0) - 2024-12-19
+
+### Added
+- add BinaryNumericFn for array arithmetic (#1640)
+
+### Other
+- Added a list builder ([#1711](https://github.com/doki23/vortex/pull/1711))
+
+## `vortex-buffer` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-buffer-v0.21.1...vortex-buffer-v0.22.0) - 2024-12-19
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+- move IoBuf to vortex-io (#1714)
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+
+## `vortex-array` - [0.22.0](https://github.com/doki23/vortex/compare/vortex-array-v0.21.1...vortex-array-v0.22.0) - 2024-12-19
+
+### Added
+- add BinaryNumericFn for array arithmetic (#1640)
+
+### Fixed
+- better child names (#1722)
+- BitPackedArray enforces can only be built over non-negative values (#1705)
+
+### Other
+- Use vortex-buffer over bytes::Bytes ([#1713](https://github.com/doki23/vortex/pull/1713))
+- Fix builder bugs ([#1718](https://github.com/doki23/vortex/pull/1718))
+- Named child arrays ([#1710](https://github.com/doki23/vortex/pull/1710))
+- Add debug assertions to ComputeFn results ([#1716](https://github.com/doki23/vortex/pull/1716))
+- Added a list builder ([#1711](https://github.com/doki23/vortex/pull/1711))
+- Message Codec ([#1692](https://github.com/doki23/vortex/pull/1692))
+- use PrimitiveArray::patch in bitpacking take (#1690)
+
 ## `vortex-datafusion` - [0.21.1](https://github.com/spiraldb/vortex/compare/vortex-datafusion-v0.20.0...vortex-datafusion-v0.21.1) - 2024-12-16
 
 ### Added
